@@ -1,8 +1,9 @@
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, Plane, useHelper } from '@react-three/drei'
 import { BoxHelper, PlaneHelper } from 'three'
 import { VertexNormalsHelper } from 'three-stdlib'
+import * as THREE from 'three'
 
 function Box(props) {
   // This reference gives us direct access to the THREE.Mesh object
@@ -37,27 +38,82 @@ function Box(props) {
   )
 }
 
-function MyPlane() {
-  const mesh = useRef()
+function getPointsFromFigure(mesh) {
+  let pos = mesh.geometry.attributes.position
+  let points = []
+  for (let i = 0; i < 4; i++) {
+    let v = new THREE.Vector3()
+    v.fromBufferAttribute(pos, i)
+    points.push(v)
+  }
 
+  return [
+    points[0], // tl
+    points[3], // tr
+    points[1], // br
+    points[2] // bl
+  ]
+}
+
+function getPlane(mesh) {
+  mesh.updateMatrix()
+  const worldPoints = getPointsFromFigure(mesh).map((p) => {
+    return mesh.localToWorld(p)
+  })
+
+  const pivot = worldPoints[1] // tr
+
+  const pivotToTL = worldPoints[0].clone().sub(pivot)
+  const pivotToBR = worldPoints[2].clone().sub(pivot)
+
+  const normal = new THREE.Vector3().crossVectors(pivotToBR, pivotToTL)
+
+  return new THREE.Plane(normal)
+}
+
+function alignMeshes(baseMesh, otherMesh, groupToRotate) {
+  const basePlane = getPlane(baseMesh)
+  const otherPlane = getPlane(otherMesh)
+
+  const baseNormal = basePlane.normal.normalize()
+  console.log(baseNormal)
+  const otherNormal = otherPlane.normal.normalize()
+  console.log(otherNormal)
+
+  const m = baseNormal.clone().add(otherNormal).normalize()
+
+  const axis = m.clone().cross(baseNormal)
+
+  const angle = m.clone().dot(baseNormal)
+
+  const q = new THREE.Quaternion(axis.x, axis.y, axis.z, angle).normalize()
+
+  console.log(q.normalize())
+
+  console.log(basePlane)
+
+  groupToRotate.applyQuaternion(q)
+}
+
+function MyPlane({ sRef, color }) {
   //var vnh = new THREE.VertexNormalsHelper( mesh, 1, 0xff0000 );
-  useHelper(mesh, VertexNormalsHelper, 0.2, 'red')
+  useHelper(sRef, VertexNormalsHelper, 0.2, 'red')
 
   return (
     <Plane
-      ref={mesh}
+      ref={sRef}
       onUpdate={(self) => {
         self.geometry.computeVertexNormals()
       }}>
-      <meshPhongMaterial attach="material" color="#f3f3f3" />
+      <meshPhongMaterial attach="material" color={color ?? '#f3f3f3'} />
     </Plane>
   )
 }
 
-function Figure({ position, rotation }) {
+function Figure({ sRef, position, rotation, color, groupRef }) {
   return (
-    <group position={position} rotation={rotation}>
-      <MyPlane />
+    <group ref={groupRef} position={position} rotation={rotation}>
+      <MyPlane sRef={sRef} color={color} />
       <SideIndicator />
     </group>
   )
@@ -77,13 +133,23 @@ function SideIndicator() {
 }
 
 export default function App() {
+  const baseRef = useRef()
+  const otherRef = useRef()
+  const groupRef = useRef()
+
+  useEffect(() => {
+    setTimeout(() => {
+      alignMeshes(baseRef.current, otherRef.current, groupRef.current)
+    }, 1000)
+  }, [])
+
   return (
     <Canvas>
       <ambientLight intensity={0.5} />
       <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} />
       <pointLight position={[-10, -10, -10]} />
-      <Figure position={[-0.5, 0, 0]} rotation={[-0.3, 0, 0]} />
-      <Figure position={[0.7, 0.5, 0]} />
+      <Figure sRef={baseRef} color="green" position={[-0.5, 0, 0]} rotation={[-0.3, 0, 0]} />
+      <Figure sRef={otherRef} groupRef={groupRef} position={[0.7, 0.5, 0]} />
       <OrbitControls />
     </Canvas>
   )
