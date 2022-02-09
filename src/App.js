@@ -41,17 +41,19 @@ function Box(props) {
 function getPointsFromFigure(mesh) {
   let pos = mesh.geometry.attributes.position
   let points = []
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 8; i++) {
     let v = new THREE.Vector3()
     v.fromBufferAttribute(pos, i)
     points.push(v)
   }
 
+  // console.log('Points', points)
+
   return [
-    points[0], // tl
-    points[3], // tr
-    points[1], // br
-    points[2] // bl
+    points[5], // tl
+    points[0], // tr
+    points[2], // br
+    points[7] // bl
   ]
 }
 
@@ -76,9 +78,9 @@ function alignMeshes(baseMesh, otherMesh, groupToRotate) {
   const otherPlane = getPlane(otherMesh)
 
   const baseNormal = basePlane.normal.normalize()
-  console.log(baseNormal)
+  // console.log(baseNormal)
   const otherNormal = otherPlane.normal.normalize()
-  console.log(otherNormal)
+  // console.log(otherNormal)
 
   const m = baseNormal.clone().add(otherNormal).normalize()
 
@@ -88,9 +90,9 @@ function alignMeshes(baseMesh, otherMesh, groupToRotate) {
 
   const q = new THREE.Quaternion(axis.x, axis.y, axis.z, angle).normalize()
 
-  console.log(q.normalize())
+  // console.log(q.normalize())
 
-  console.log(basePlane)
+  // console.log(basePlane)
 
   groupToRotate.applyQuaternion(q)
 }
@@ -98,6 +100,18 @@ function alignMeshes(baseMesh, otherMesh, groupToRotate) {
 function MyPlane({ sRef, color }) {
   //var vnh = new THREE.VertexNormalsHelper( mesh, 1, 0xff0000 );
   useHelper(sRef, VertexNormalsHelper, 0.2, 'red')
+
+  return (
+    <mesh ref={sRef}>
+      <boxGeometry
+        args={[1, 1, 0.05]}
+        onUpdate={(self) => {
+          self.computeVertexNormals()
+        }}
+      />
+      <meshStandardMaterial color={color} />
+    </mesh>
+  )
 
   return (
     <Plane
@@ -123,7 +137,7 @@ function SideIndicator() {
   return (
     <Plane
       args={[0.05, 0.8]}
-      position={[0.45, 0, 0.01]}
+      position={[0.45, 0, 0.03]}
       onUpdate={(self) => {
         self.geometry.computeVertexNormals()
       }}>
@@ -133,24 +147,36 @@ function SideIndicator() {
 }
 
 export default function App() {
+  return (
+    <Canvas>
+      <Dummy />
+    </Canvas>
+  )
+}
+
+function Dummy() {
   const baseRef = useRef()
   const otherRef = useRef()
   const groupRef = useRef()
+  const baseGroupRef = useRef()
 
-  useEffect(() => {
-    setTimeout(() => {
-      alignMeshes(baseRef.current, otherRef.current, groupRef.current)
-    }, 1000)
-  }, [])
+  // useEffect(() => {
+  //   alignMeshes(baseRef.current, otherRef.current, groupRef.current)
+  // }, [])
 
+  useFrame(() => {
+    baseGroupRef.current.rotation.x += 0.01
+    // baseGroupRef.current.rotation.y += 0.01
+    alignMeshes(baseRef.current, otherRef.current, groupRef.current)
+  })
   return (
-    <Canvas>
+    <>
       <ambientLight intensity={0.5} />
       <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} />
       <pointLight position={[-10, -10, -10]} />
-      <Figure sRef={baseRef} color="green" position={[-0.5, 0, 0]} rotation={[-0.3, 0, 0]} />
+      <Figure sRef={baseRef} groupRef={baseGroupRef} color="green" position={[-0.5, 0, 0]} rotation={[-0.3, 0, 0]} />
       <Figure sRef={otherRef} groupRef={groupRef} position={[0.7, 0.5, 0]} />
       <OrbitControls />
-    </Canvas>
+    </>
   )
 }
