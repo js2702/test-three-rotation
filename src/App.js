@@ -58,7 +58,7 @@ function getPointsFromFigure(mesh) {
 }
 
 function getPlane(mesh) {
-  mesh.updateMatrix()
+  // mesh.updateMatrix()
   const worldPoints = getPointsFromFigure(mesh).map((p) => {
     return mesh.localToWorld(p)
   })
@@ -73,6 +73,37 @@ function getPlane(mesh) {
   return new THREE.Plane(normal)
 }
 
+function getAlignPlaneQuaternion(baseNormal, otherNormal) {
+  const m = baseNormal.clone().add(otherNormal).normalize()
+  const axis = m.clone().cross(baseNormal)
+  const angle = m.clone().dot(baseNormal)
+  const q = new THREE.Quaternion(axis.x, axis.y, axis.z, angle).normalize()
+  return q
+}
+
+function getBond(mesh) {
+  const baseWorldPoints = getPointsFromFigure(mesh).map((p) => {
+    return mesh.localToWorld(p)
+  })
+
+  const TR = baseWorldPoints[1]
+  const BR = baseWorldPoints[2]
+
+  return [TR, BR]
+}
+
+function getBondNormal([v, w], originalPlaneNormal) {
+  const bondDir = v.clone().sub(w).normalize()
+
+  const bondNormal = new THREE.Vector3()
+    .copy(originalPlaneNormal)
+    .applyAxisAngle(bondDir, -Math.PI / 2)
+    .normalize()
+
+  console.log('bondnormal', bondNormal)
+  return bondNormal
+}
+
 function alignMeshes(baseMesh, otherMesh, groupToRotate) {
   const basePlane = getPlane(baseMesh)
   const otherPlane = getPlane(otherMesh)
@@ -82,19 +113,53 @@ function alignMeshes(baseMesh, otherMesh, groupToRotate) {
   const otherNormal = otherPlane.normal.normalize()
   // console.log(otherNormal)
 
-  const m = baseNormal.clone().add(otherNormal).normalize()
+  // Make planes parallel
+  const q = getAlignPlaneQuaternion(baseNormal, otherNormal)
+  groupToRotate.applyQuaternion(q)
 
-  const axis = m.clone().cross(baseNormal)
+  // Coger perpendicular del enlace
+  groupToRotate.updateWorldMatrix(true, true)
+  const baseBond = getBond(baseMesh)
+  const otherBond = getBond(otherMesh)
 
-  const angle = m.clone().dot(baseNormal)
+  console.log('Base bond', baseBond)
+  console.log('Other bond', otherBond)
 
-  const q = new THREE.Quaternion(axis.x, axis.y, axis.z, angle).normalize()
+  const freshOtherPlane = getPlane(otherMesh)
+  const freshOtherNormal = freshOtherPlane.normal.normalize()
+
+  console.log(freshOtherNormal, baseNormal, otherNormal)
+
+  const baseBondNormal = getBondNormal(baseBond, baseNormal)
+  const otherBondNormal = getBondNormal(otherBond, baseNormal)
+  const angleBetweenBondNormals = baseBondNormal.angleTo(otherBondNormal)
+
+  const degBondAngle = THREE.MathUtils.radToDeg(angleBetweenBondNormals)
+  let orientationAngle
+  orientationAngle = Math.PI - angleBetweenBondNormals
+  // if (degBondAngle >= 0 && degBondAngle < 90) {
+  //   console.log('1')
+  //   orientationAngle = angleBetweenBondNormals
+  // } else if (degBondAngle >= 90 && degBondAngle < 180) {
+  //   console.log('2')
+  //   orientationAngle = -angleBetweenBondNormals
+  // } else if (degBondAngle >= 180 && degBondAngle < 270) {
+  //   console.log('3')
+  //   orientationAngle = -angleBetweenBondNormals
+  // } else {
+  //   console.log('4')
+  //   orientationAngle = -angleBetweenBondNormals
+  // }
+
+  console.log('Between bonds', THREE.MathUtils.radToDeg(angleBetweenBondNormals), 'final', THREE.MathUtils.radToDeg(orientationAngle))
+  groupToRotate.rotateOnAxis(new THREE.Vector3(0, 0, 1), orientationAngle)
+  groupToRotate.updateWorldMatrix(true, true)
+
+  // const baseV =
 
   // console.log(q.normalize())
 
   // console.log(basePlane)
-
-  groupToRotate.applyQuaternion(q)
 }
 
 function MyPlane({ sRef, color }) {
@@ -160,22 +225,26 @@ function Dummy() {
   const groupRef = useRef()
   const baseGroupRef = useRef()
 
-  // useEffect(() => {
-  //   alignMeshes(baseRef.current, otherRef.current, groupRef.current)
-  // }, [])
+  useEffect(() => {
+    setTimeout(() => {
+      alignMeshes(baseRef.current, otherRef.current, groupRef.current)
+    }, 1000)
+  }, [])
 
   useFrame(() => {
-    baseGroupRef.current.rotation.x += 0.01
-    // baseGroupRef.current.rotation.y += 0.01
+    baseGroupRef.current.rotation.z += 0.01
+    baseGroupRef.current.rotation.y += 0.02
+    baseGroupRef.current.rotation.x += 0.04
     alignMeshes(baseRef.current, otherRef.current, groupRef.current)
   })
+
   return (
     <>
       <ambientLight intensity={0.5} />
       <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} />
       <pointLight position={[-10, -10, -10]} />
-      <Figure sRef={baseRef} groupRef={baseGroupRef} color="green" position={[-0.5, 0, 0]} rotation={[-0.3, 0, 0]} />
-      <Figure sRef={otherRef} groupRef={groupRef} position={[0.7, 0.5, 0]} />
+      <Figure sRef={baseRef} groupRef={baseGroupRef} color="green" position={[-0.7, 0, 0]} rotation={[-0.3, 0.5, Math.PI + Math.PI / 4]} />
+      <Figure sRef={otherRef} groupRef={groupRef} position={[0.7, 0, 0]} />
       <OrbitControls />
     </>
   )
