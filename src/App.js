@@ -106,6 +106,16 @@ function getBondNormal([v, w], originalPlaneNormal) {
 
 let stopAnimation = false
 
+function getAngleBetweenBonds(a, b) {
+  let angle = a.angleTo(b)
+
+  const orientation = a.x * b.z - a.z * b.x
+  console.log('Orientation', orientation)
+  if (orientation > 0) angle = 2 * Math.PI - angle
+
+  return angle
+}
+
 function alignMeshes(baseMesh, otherMesh, groupToRotate) {
   const basePlane = getPlane(baseMesh)
   const otherPlane = getPlane(otherMesh)
@@ -134,13 +144,19 @@ function alignMeshes(baseMesh, otherMesh, groupToRotate) {
 
   const baseBondNormal = getBondNormal(baseBond, baseNormal)
   const otherBondNormal = getBondNormal(otherBond, baseNormal)
-  const angleBetweenBondNormals = baseBondNormal.angleTo(otherBondNormal)
+
+  const angleBetweenBondNormals = getAngleBetweenBonds(baseBondNormal, otherBondNormal)
 
   const degBondAngle = THREE.MathUtils.radToDeg(angleBetweenBondNormals)
   let orientationAngle
-  orientationAngle = Math.PI - angleBetweenBondNormals
 
-  console.log(baseNormal, freshOtherNormal)
+  orientationAngle = angleBetweenBondNormals
+
+  console.log('normal', baseNormal, 'angle between normals', degBondAngle)
+  console.log('bondNormals', baseBondNormal.toArray(), 'other', otherBondNormal.toArray())
+
+  baseInfo = new FigureInfo(baseBondNormal, baseBond[0], baseBond[1])
+  otherInfo = new FigureInfo(otherBondNormal, otherBond[0], otherBond[1])
   // if (degBondAngle >= 0 && degBondAngle < 90) {
   //   console.log('1')
   //   orientationAngle = angleBetweenBondNormals
@@ -156,8 +172,10 @@ function alignMeshes(baseMesh, otherMesh, groupToRotate) {
   // }
 
   // console.log('Between bonds', THREE.MathUtils.radToDeg(angleBetweenBondNormals), 'final', THREE.MathUtils.radToDeg(orientationAngle))
-
-  groupToRotate.rotateOnAxis(new THREE.Vector3(0, 0, 1), orientationAngle)
+  const alignBondVectorsQ = new THREE.Quaternion().setFromUnitVectors(otherBondNormal, baseBondNormal.clone().multiplyScalar(-1))
+  groupToRotate.applyQuaternion(alignBondVectorsQ)
+  // groupToRotate.rotateOnAxis(new THREE.Vector3(0, 0, 1), orientationAngle)
+  // groupToRotate.lookAt(baseBondNormal)
   groupToRotate.updateWorldMatrix(true, true)
 
   const isFirstTime = currentAngle === null
@@ -257,6 +275,28 @@ function Controls() {
   return <OrbitControls ref={ref} args={[camera, gl.domElement]} />
 }
 
+class FigureInfo {
+  constructor(bondNormal, v, w) {
+    this.bondNormal = bondNormal
+    this.v = v
+    this.w = w
+  }
+}
+
+let baseInfo
+let otherInfo
+
+function FigureInfoComponent({ info }) {
+  if (!info) {
+    return null
+  }
+
+  const midPoint = info.v.clone().add(info.w).multiplyScalar(0.5)
+
+  return <arrowHelper args={[info.bondNormal.normalize(), midPoint, 0.5]} />
+  // return <arrowHelper args={[new THREE.Vector3(1, 1, 0).normalize(), new THREE.Vector3(0, 0, 0), 1]} />
+}
+
 function Dummy() {
   const baseRef = useRef()
   const otherRef = useRef()
@@ -277,17 +317,28 @@ function Dummy() {
     alignMeshes(baseRef.current, otherRef.current, groupRef.current)
   }
 
+  const [baseInfoState, setBaseInfoState] = useState()
+  const [otherInfoState, setOtherInfoState] = useState()
+
   useFrame(() => {
     if (currentAngle !== null && currentAngle.toFixed(4) === '0.2682') {
       console.log('Ay', baseGroupRef.current.rotation)
     } else {
-      // triggerAnimation()
+    }
+
+    triggerAnimation()
+    if (baseInfo) {
+      setBaseInfoState(baseInfo)
+    }
+
+    if (otherInfo) {
+      setOtherInfoState(otherInfo)
     }
   })
 
-  const initialRotation = [5.9, 3.6, 5.48]
+  // const initialRotation = [5.9, 3.6, 5.48]
   // const initialRotation = [6.14, 3.72, 5.54]
-  // const initialRotation = [-0.3, 0.5, Math.PI + Math.PI / 4]
+  const initialRotation = [-0.3, 0.5, Math.PI + Math.PI / 4]
 
   return (
     <>
@@ -300,6 +351,8 @@ function Dummy() {
       <ButtonForPros onClick={triggerAnimation} />
       <axesHelper args={[3]} />
       <gridHelper />
+      <FigureInfoComponent info={baseInfoState} />
+      <FigureInfoComponent info={otherInfoState} />
     </>
   )
 }
