@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
+import { Canvas, invalidate, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Plane, useHelper } from '@react-three/drei'
 import { BoxHelper, PlaneHelper } from 'three'
 import { VertexNormalsHelper } from 'three-stdlib'
@@ -100,9 +100,11 @@ function getBondNormal([v, w], originalPlaneNormal) {
     .applyAxisAngle(bondDir, -Math.PI / 2)
     .normalize()
 
-  console.log('bondnormal', bondNormal)
+  // console.log('bondnormal', bondNormal)
   return bondNormal
 }
+
+let stopAnimation = false
 
 function alignMeshes(baseMesh, otherMesh, groupToRotate) {
   const basePlane = getPlane(baseMesh)
@@ -122,13 +124,13 @@ function alignMeshes(baseMesh, otherMesh, groupToRotate) {
   const baseBond = getBond(baseMesh)
   const otherBond = getBond(otherMesh)
 
-  console.log('Base bond', baseBond)
-  console.log('Other bond', otherBond)
+  // console.log('Base bond', baseBond)
+  // console.log('Other bond', otherBond)
 
   const freshOtherPlane = getPlane(otherMesh)
   const freshOtherNormal = freshOtherPlane.normal.normalize()
 
-  console.log(freshOtherNormal, baseNormal, otherNormal)
+  // console.log(freshOtherNormal, baseNormal, otherNormal)
 
   const baseBondNormal = getBondNormal(baseBond, baseNormal)
   const otherBondNormal = getBondNormal(otherBond, baseNormal)
@@ -137,6 +139,8 @@ function alignMeshes(baseMesh, otherMesh, groupToRotate) {
   const degBondAngle = THREE.MathUtils.radToDeg(angleBetweenBondNormals)
   let orientationAngle
   orientationAngle = Math.PI - angleBetweenBondNormals
+
+  console.log(baseNormal, freshOtherNormal)
   // if (degBondAngle >= 0 && degBondAngle < 90) {
   //   console.log('1')
   //   orientationAngle = angleBetweenBondNormals
@@ -151,9 +155,16 @@ function alignMeshes(baseMesh, otherMesh, groupToRotate) {
   //   orientationAngle = -angleBetweenBondNormals
   // }
 
-  console.log('Between bonds', THREE.MathUtils.radToDeg(angleBetweenBondNormals), 'final', THREE.MathUtils.radToDeg(orientationAngle))
+  // console.log('Between bonds', THREE.MathUtils.radToDeg(angleBetweenBondNormals), 'final', THREE.MathUtils.radToDeg(orientationAngle))
+
   groupToRotate.rotateOnAxis(new THREE.Vector3(0, 0, 1), orientationAngle)
   groupToRotate.updateWorldMatrix(true, true)
+
+  const isFirstTime = currentAngle === null
+  const dif = isFirstTime ? 0 : Math.abs(orientationAngle - currentAngle)
+
+  currentAngle = orientationAngle
+  console.log('dif', dif.toFixed(4), currentAngle.toFixed(4))
 
   // const baseV =
 
@@ -213,10 +224,37 @@ function SideIndicator() {
 
 export default function App() {
   return (
-    <Canvas>
+    <Canvas frameloop="demand" onCreated={(state) => state.gl.setClearColor('black')}>
       <Dummy />
     </Canvas>
   )
+}
+
+let currentAngle = null
+
+function ButtonForPros({ onClick }) {
+  const { invalidate, camera, gl } = useThree()
+  return (
+    <mesh
+      onClick={() => {
+        onClick()
+        invalidate()
+      }}
+      position={[2, 2, 0]}>
+      <boxGeometry args={[0.5, 0.5, 0.05]} />
+      <meshStandardMaterial color={'green'} />
+    </mesh>
+  )
+}
+
+function Controls() {
+  const ref = useRef()
+  const { invalidate, camera, gl } = useThree()
+  useEffect(() => {
+    ref.current.addEventListener('change', invalidate)
+    return () => ref.current.removeEventListener('change', invalidate)
+  }, [])
+  return <OrbitControls ref={ref} args={[camera, gl.domElement]} />
 }
 
 function Dummy() {
@@ -228,24 +266,40 @@ function Dummy() {
   useEffect(() => {
     setTimeout(() => {
       alignMeshes(baseRef.current, otherRef.current, groupRef.current)
+      invalidate()
     }, 1000)
   }, [])
 
-  useFrame(() => {
+  function triggerAnimation() {
     baseGroupRef.current.rotation.z += 0.01
     baseGroupRef.current.rotation.y += 0.02
     baseGroupRef.current.rotation.x += 0.04
     alignMeshes(baseRef.current, otherRef.current, groupRef.current)
+  }
+
+  useFrame(() => {
+    if (currentAngle !== null && currentAngle.toFixed(4) === '0.2682') {
+      console.log('Ay', baseGroupRef.current.rotation)
+    } else {
+      // triggerAnimation()
+    }
   })
+
+  const initialRotation = [5.9, 3.6, 5.48]
+  // const initialRotation = [6.14, 3.72, 5.54]
+  // const initialRotation = [-0.3, 0.5, Math.PI + Math.PI / 4]
 
   return (
     <>
       <ambientLight intensity={0.5} />
       <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} />
       <pointLight position={[-10, -10, -10]} />
-      <Figure sRef={baseRef} groupRef={baseGroupRef} color="green" position={[-0.7, 0, 0]} rotation={[-0.3, 0.5, Math.PI + Math.PI / 4]} />
+      <Figure sRef={baseRef} groupRef={baseGroupRef} color="green" position={[-0.7, 0, 0]} rotation={initialRotation} />
       <Figure sRef={otherRef} groupRef={groupRef} position={[0.7, 0, 0]} />
-      <OrbitControls />
+      <Controls />
+      <ButtonForPros onClick={triggerAnimation} />
+      <axesHelper args={[3]} />
+      <gridHelper />
     </>
   )
 }
