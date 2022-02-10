@@ -137,42 +137,17 @@ function alignMeshes(baseMesh, otherMesh, groupToRotate) {
   // console.log('Base bond', baseBond)
   // console.log('Other bond', otherBond)
 
-  const freshOtherPlane = getPlane(otherMesh)
-  const freshOtherNormal = freshOtherPlane.normal.normalize()
-
   // console.log(freshOtherNormal, baseNormal, otherNormal)
 
   const baseBondNormal = getBondNormal(baseBond, baseNormal)
   const otherBondNormal = getBondNormal(otherBond, baseNormal)
 
-  const angleBetweenBondNormals = getAngleBetweenBonds(baseBondNormal, otherBondNormal)
-
-  const degBondAngle = THREE.MathUtils.radToDeg(angleBetweenBondNormals)
-  let orientationAngle
-
-  orientationAngle = angleBetweenBondNormals
-
-  console.log('normal', baseNormal, 'angle between normals', degBondAngle)
-  console.log('bondNormals', baseBondNormal.toArray(), 'other', otherBondNormal.toArray())
-
   baseInfo = new FigureInfo(baseBondNormal, baseBond[0], baseBond[1])
   otherInfo = new FigureInfo(otherBondNormal, otherBond[0], otherBond[1])
-  // if (degBondAngle >= 0 && degBondAngle < 90) {
-  //   console.log('1')
-  //   orientationAngle = angleBetweenBondNormals
-  // } else if (degBondAngle >= 90 && degBondAngle < 180) {
-  //   console.log('2')
-  //   orientationAngle = -angleBetweenBondNormals
-  // } else if (degBondAngle >= 180 && degBondAngle < 270) {
-  //   console.log('3')
-  //   orientationAngle = -angleBetweenBondNormals
-  // } else {
-  //   console.log('4')
-  //   orientationAngle = -angleBetweenBondNormals
-  // }
 
   // console.log('Between bonds', THREE.MathUtils.radToDeg(angleBetweenBondNormals), 'final', THREE.MathUtils.radToDeg(orientationAngle))
-  const alignBondVectorsQ = new THREE.Quaternion().setFromUnitVectors(otherBondNormal, baseBondNormal.clone().multiplyScalar(-1))
+  const targetBondNormal = baseBondNormal.clone().multiplyScalar(-1)
+  const alignBondVectorsQ = q.setFromUnitVectors(otherBondNormal, targetBondNormal)
   groupToRotate.applyQuaternion(alignBondVectorsQ)
   // groupToRotate.rotateOnAxis(new THREE.Vector3(0, 0, 1), orientationAngle)
   // groupToRotate.lookAt(baseBondNormal)
