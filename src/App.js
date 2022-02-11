@@ -116,6 +116,8 @@ function getAngleBetweenBonds(a, b) {
   return angle
 }
 
+let isFirst = true
+
 function alignMeshes(baseMesh, otherMesh, groupToRotate) {
   const basePlane = getPlane(baseMesh)
   const otherPlane = getPlane(otherMesh)
@@ -147,7 +149,6 @@ function alignMeshes(baseMesh, otherMesh, groupToRotate) {
   // groupToRotate.rotateOnAxis(new THREE.Vector3(0, 0, 1), orientationAngle)
   // groupToRotate.lookAt(baseBondNormal)
   groupToRotate.updateWorldMatrix(true, true)
-
   translateFigure(baseMesh, otherMesh, groupToRotate)
 }
 
@@ -158,7 +159,8 @@ function translateFigure(baseMesh, otherMesh, groupToRotate) {
   const baseMidPoint = baseBond[1].clone().add(baseBond[0]).multiplyScalar(0.5)
   const otherMidPoint = otherBond[1].clone().add(otherBond[0]).multiplyScalar(0.5)
 
-  groupToRotate.position.add(baseMidPoint.sub(otherMidPoint))
+  const dif = baseMidPoint.sub(otherMidPoint)
+  groupToRotate.position.add(dif)
   groupToRotate.updateWorldMatrix(true, true)
 }
 
@@ -285,6 +287,7 @@ function Dummy() {
     baseGroupRef.current.rotation.z += 0.01
     baseGroupRef.current.rotation.y += 0.02
     baseGroupRef.current.rotation.x += 0.04
+    baseGroupRef.current.updateWorldMatrix(true, true)
     alignMeshes(baseRef.current, otherRef.current, groupRef.current)
   }
 
@@ -292,11 +295,6 @@ function Dummy() {
   const [otherInfoState, setOtherInfoState] = useState()
 
   useFrame(() => {
-    if (currentAngle !== null && currentAngle.toFixed(4) === '0.2682') {
-      console.log('Ay', baseGroupRef.current.rotation)
-    } else {
-    }
-
     triggerAnimation()
     if (baseInfo) {
       setBaseInfoState(baseInfo)
