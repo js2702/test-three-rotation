@@ -134,11 +134,6 @@ function alignMeshes(baseMesh, otherMesh, groupToRotate) {
   const baseBond = getBond(baseMesh)
   const otherBond = getBond(otherMesh)
 
-  // console.log('Base bond', baseBond)
-  // console.log('Other bond', otherBond)
-
-  // console.log(freshOtherNormal, baseNormal, otherNormal)
-
   const baseBondNormal = getBondNormal(baseBond, baseNormal)
   const otherBondNormal = getBondNormal(otherBond, baseNormal)
 
@@ -153,17 +148,18 @@ function alignMeshes(baseMesh, otherMesh, groupToRotate) {
   // groupToRotate.lookAt(baseBondNormal)
   groupToRotate.updateWorldMatrix(true, true)
 
-  const isFirstTime = currentAngle === null
-  const dif = isFirstTime ? 0 : Math.abs(orientationAngle - currentAngle)
+  translateFigure(baseMesh, otherMesh, groupToRotate)
+}
 
-  currentAngle = orientationAngle
-  console.log('dif', dif.toFixed(4), currentAngle.toFixed(4))
+function translateFigure(baseMesh, otherMesh, groupToRotate) {
+  const baseBond = getBond(baseMesh)
+  const otherBond = getBond(otherMesh)
 
-  // const baseV =
+  const baseMidPoint = baseBond[1].clone().add(baseBond[0]).multiplyScalar(0.5)
+  const otherMidPoint = otherBond[1].clone().add(otherBond[0]).multiplyScalar(0.5)
 
-  // console.log(q.normalize())
-
-  // console.log(basePlane)
+  groupToRotate.position.add(baseMidPoint.sub(otherMidPoint))
+  groupToRotate.updateWorldMatrix(true, true)
 }
 
 function MyPlane({ sRef, color }) {
